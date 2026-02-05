@@ -1,54 +1,47 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// A kulcsodat a .env.local fájlból veszi (VITE_ prefixszel)
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const genAI = new GoogleGenerativeAI(API_KEY || "");
+const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
-// Segédfüggvény: a képet átalakítja a Google számára érthető formátumra
-const dataUrlToPart = (dataUrl: string) => {
-    return {
-        inlineData: {
-            data: dataUrl.split(',')[1],
-            mimeType: "image/png"
-        }
-    };
-};
+export async function generateSketch(
+  imageBase64: string,
+  style: string,
+  detail: number,
+  shading: number,
+  stroke: number,
+  roughness: number
+): Promise<string> {
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-// 1. KÉP ÁTALAKÍTÁSA (Ez fut le, amikor feltöltesz)
-export const generateSketch = async (
-    image: string, 
-    style: string, 
-    detail: number, 
-    shading: number
-) => {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    
-    const prompt = `Alakítsd át ezt a képet ${style} stílusú vázlattá. 
-                    Részletesség: ${detail}%, Árnyékolás: ${shading}%. 
-                    Kérlek, egy részletes leírást adj az új képről.`;
+  // 1. Lépés: Megkérjük a Geminit, hogy írja le a képet vázlat formájában
+  const prompt = `Describe this image as a ${style} sketch. Focus on details: ${detail}%, shading: ${shading}%, stroke width: ${stroke}%. Output only a detailed English prompt for an image generator.`;
 
-    const result = await model.generateContent([prompt, dataUrlToPart(image)]);
-    const response = await result.response;
-    
-    // Mivel a Gemini szöveges, itt egyelőre a szöveges leírást kapod vissza
-    // Később ide kötjük be a tényleges képgenerálót
-    console.log("AI Válasza:", response.text());
-    return image; // Egyelőre az eredetit adja vissza, hogy ne szálljon el a program
-};
+  const parts = [
+    { text: prompt },
+    {
+      inlineData: {
+        mimeType: "image/png",
+        data: imageBase64.split(",")[1],
+      },
+    },
+  ];
 
-// 2. MÓDOSÍTÁS PROMPTTAL (Ez fut le a kis szövegdoboznál)
-export const refineSketch = async (image: string, editPrompt: string, style: string) => {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent([
-        `Módosítsd ezt a ${style} vázlatot: ${editPrompt}`, 
-        dataUrlToPart(image)
-    ]);
-    return image; 
-};
+  const result = await model.generateContent(parts);
+  const aiDescription = result.response.text();
 
-// 3. KÉP GENERÁLÁSA SZÖVEGBŐL
-export const generateImageFromPrompt = async (prompt: string) => {
-    // Itt hívnánk meg az Imagen-t vagy más generátort
-    console.log("Generálás ebből:", prompt);
-    return "https://via.placeholder.com/1024"; // Ideiglenes kép
-};
+  // 2. Lépés: Az AI leírását elküldjük egy ingyenes rajzoló motornak
+  // A Pollinations AI-t használjuk, ami azonnal képet ad vissza
+  const encodedPrompt = encodeURIComponent(`${style} sketch, ${aiDescription}, white background, artistic lines, high quality`);
+  const imageUrl = `https://pollinations.ai/p/${encodedPrompt}?width=1024&height=1024&seed=${Math.floor(Math.random() * 1000)}`;
+
+  return imageUrl;
+}
+
+export async function refineSketch(image: string, prompt: string, style: string): Promise<string> {
+    const encodedPrompt = encodeURIComponent(`${style} sketch, ${prompt}, high detail`);
+    return `https://pollinations.ai/p/${encodedPrompt}?width=1024&height=1024&seed=${Math.floor(Math.random() * 1000)}`;
+}
+
+export async function generateImageFromPrompt(prompt: string): Promise<string> {
+    const encodedPrompt = encodeURIComponent(prompt);
+    return `https://pollinations.ai/p/${encodedPrompt}?width=1024&height=1024&seed=${Math.floor(Math.random() * 1000)}`;
+}
