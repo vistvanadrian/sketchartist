@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { AppState, SketchStyle, FileFormat } from './types';
 import { TRANSLATIONS, SKETCH_STYLES, SKETCH_STYLE_NAMES } from './constants';
-import { generateSketch, refineSketch, generateImageFromPrompt } from './services/sketchService';
+import { generateSketch, refineSketch, generateImageFromPrompt } from '.sketchService';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
